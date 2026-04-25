@@ -1,0 +1,376 @@
+// packages/database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ÓRGÃO PÚBLICO
+// ─────────────────────────────────────────────
+model Orgao {
+  id          String  @id @default(uuid())
+  cnpj        String  @unique
+  razaoSocial String
+  nomeFantasia String?
+  esfera      Esfera
+  poder       Poder
+  uf          String  @db.Char(2)
+  municipio   String?
+  uasg        String? @unique   // código SISG (Comprasnet)
+  codigoPncp  String? @unique   // código PNCP
+
+  licitacoes  Licitacao[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([uf])
+  @@index([esfera])
+  @@map("orgaos")
+}
+
+// ─────────────────────────────────────────────
+// LICITAÇÃO
+// ─────────────────────────────────────────────
+model Licitacao {
+  id                String      @id @default(uuid())
+  numeroEdital      String
+  titulo            String
+  objeto            String      @db.Text
+  modalidade        Modalidade
+  situacao          Situacao    @default(ABERTA)
+  valorEstimado     Decimal?    @db.Decimal(15, 2)
+  valorHomologado   Decimal?    @db.Decimal(15, 2)
+
+  dataPublicacao    DateTime
+  dataAbertura      DateTime
+  dataEncerramento  DateTime?
+  dataHomologacao   DateTime?
+
+  linkEdital        String
+  portalOrigem      Portal
+  codigoExterno     String      // ID no portal de origem
+  anoCompra         Int
+
+  // Localização
+  uf                String      @db.Char(2)
+  municipio         String?
+
+  // Relações
+  orgaoId           String
+  orgao             Orgao       @relation(fields: [orgaoId], references: [id])
+  anexos            EditalAnexo[]
+  favoritos         Favorito[]
+  notificacoes      Notificacao[]
+  itens             LicitacaoItem[]
+
+  // Metadados de indexação
+  indexadoEm        DateTime?
+  hashConteudo      String?     // detecta mudanças no edital
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@unique([portalOrigem, codigoExterno])
+  @@index([situacao])
+  @@index([modalidade])
+  @@index([uf])
+  @@index([dataAbertura])
+  @@index([orgaoId])
+  @@index([portalOrigem])
+  @@map("licitacoes")
+}
+
+// ─────────────────────────────────────────────
+// ITENS DA LICITAÇÃO
+// ─────────────────────────────────────────────
+model LicitacaoItem {
+  id            String    @id @default(uuid())
+  licitacaoId   String
+  licitacao     Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+  numero        Int
+  descricao     String    @db.Text
+  quantidade    Decimal   @db.Decimal(12, 3)
+  unidade       String
+  valorUnitario Decimal?  @db.Decimal(15, 2)
+  valorTotal    Decimal?  @db.Decimal(15, 2)
+  codigoCatmat  String?   // catálogo de materiais
+  codigoCatser  String?   // catálogo de serviços
+
+  @@index([licitacaoId])
+  @@map("licitacao_itens")
+}
+
+// ─────────────────────────────────────────────
+// ANEXOS / DOCUMENTOS
+// ─────────────────────────────────────────────
+model EditalAnexo {
+  id            String    @id @default(uuid())
+  licitacaoId   String
+  licitacao     Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  nomeArquivo   String
+  urlOriginal   String
+  urlStorage    String?   // URL após download para S3/R2
+  tipoArquivo   String    // PDF, DOCX, ZIP, etc.
+  tamanhoBytes  BigInt?
+  checksum      String?   // SHA-256
+
+  baixadoEm    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([licitacaoId])
+  @@map("edital_anexos")
+}
+
+// ─────────────────────────────────────────────
+// USUÁRIOS E PLANOS
+// ─────────────────────────────────────────────
+model Usuario {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  nome            String
+  senhaHash       String
+  telefone        String?
+  avatarUrl       String?
+
+  plano           Plano     @default(FREE)
+  ativo           Boolean   @default(true)
+  role            Role      @default(USER)
+  emailVerificado Boolean   @default(false)
+  trialAte        DateTime?
+
+  // Stripe
+  stripeCustomerId       String? @unique
+  stripeSubscriptionId   String? @unique
+
+  // Preferências
+  telegramChatId  String?
+  notifEmail      Boolean   @default(true)
+  notifTelegram   Boolean   @default(false)
+  notifPush       Boolean   @default(false)
+
+  alertas         AlertaConfig[]
+  favoritos       Favorito[]
+  notificacoes    Notificacao[]
+  sessoes         Sessao[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("usuarios")
+}
+
+model Sessao {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  token       String   @unique
+  userAgent   String?
+  ip          String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([token])
+  @@map("sessoes")
+}
+
+// ─────────────────────────────────────────────
+// ALERTAS E PALAVRAS-CHAVE
+// ─────────────────────────────────────────────
+model AlertaConfig {
+  id            String      @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  nome          String      // ex: "Obras SP", "TI Federal"
+  palavrasChave String[]    // array de termos
+  modalidades   Modalidade[]
+  portais       Portal[]
+  ufs           String[]    @db.Char(2)
+  valorMin      Decimal?    @db.Decimal(15, 2)
+  valorMax      Decimal?    @db.Decimal(15, 2)
+
+  canal         CanalAlerta[]
+  frequencia    FreqAlerta  @default(IMEDIATO)
+  ativo         Boolean     @default(true)
+
+  notificacoes  Notificacao[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([usuarioId])
+  @@map("alerta_configs")
+}
+
+// ─────────────────────────────────────────────
+// FAVORITOS
+// ─────────────────────────────────────────────
+model Favorito {
+  id            String    @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  licitacaoId   String
+  licitacao     Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  nota          String?   @db.Text
+  tags          String[]  // tags personalizadas do usuário
+
+  createdAt     DateTime  @default(now())
+
+  @@unique([usuarioId, licitacaoId])
+  @@map("favoritos")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICAÇÕES ENVIADAS
+// ─────────────────────────────────────────────
+model Notificacao {
+  id            String      @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  licitacaoId   String
+  licitacao     Licitacao   @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+  alertaId      String?
+  alerta        AlertaConfig? @relation(fields: [alertaId], references: [id])
+
+  canal         CanalAlerta
+  status        StatusNotif @default(PENDENTE)
+  erro          String?
+  enviadoEm     DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([usuarioId])
+  @@index([status])
+  @@map("notificacoes")
+}
+
+// ─────────────────────────────────────────────
+// LOG DE COLETA DOS SCRAPERS
+// ─────────────────────────────────────────────
+model ScraperLog {
+  id              String      @id @default(uuid())
+  portal          Portal
+  status          StatusColeta
+  totalColetados  Int         @default(0)
+  totalNovos      Int         @default(0)
+  totalAtualizados Int        @default(0)
+  totalErros      Int         @default(0)
+  duracao         Int?        // segundos
+  erro            String?     @db.Text
+  iniciadoEm      DateTime    @default(now())
+  finalizadoEm    DateTime?
+
+  @@index([portal])
+  @@index([iniciadoEm])
+  @@map("scraper_logs")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+enum Modalidade {
+  PREGAO_ELETRONICO
+  PREGAO_PRESENCIAL
+  CONCORRENCIA
+  TOMADA_DE_PRECOS
+  CONVITE
+  LEILAO
+  CONCURSO
+  DISPENSA
+  INEXIGIBILIDADE
+  RDC
+  CREDENCIAMENTO
+  MANIFESTACAO_INTERESSE
+}
+
+enum Situacao {
+  ABERTA
+  SUSPENSA
+  REVOGADA
+  ANULADA
+  HOMOLOGADA
+  DESERTA
+  FRACASSADA
+  ENCERRADA
+}
+
+enum Portal {
+  PNCP
+  COMPRASNET
+  LICITACOES_E
+  BLL
+  BNC
+  LICITANET
+  PORTAL_COMPRAS_PUBLICAS
+  LICITARDIGITAL
+  BBMNET
+  NEGOCIOS_PUBLICOS
+  SOL_LICITACOES
+  EQUIPLANO
+  CITACON
+  LICITACON
+  OUTROS
+}
+
+enum Esfera {
+  FEDERAL
+  ESTADUAL
+  MUNICIPAL
+  DISTRITAL
+}
+
+enum Poder {
+  EXECUTIVO
+  LEGISLATIVO
+  JUDICIARIO
+  MINISTERIO_PUBLICO
+  TCU_TCE
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Plano {
+  FREE
+  BASICO
+  PROFISSIONAL
+  ENTERPRISE
+}
+
+enum CanalAlerta {
+  EMAIL
+  TELEGRAM
+  PUSH
+  WEBHOOK
+}
+
+enum FreqAlerta {
+  IMEDIATO
+  DIARIO
+  SEMANAL
+}
+
+enum StatusNotif {
+  PENDENTE
+  ENVIADO
+  FALHOU
+  CANCELADO
+}
+
+enum StatusColeta {
+  INICIADO
+  CONCLUIDO
+  PARCIAL
+  FALHOU
+}

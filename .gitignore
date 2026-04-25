@@ -1,0 +1,63 @@
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Prisma
+packages/database/prisma/migrations/*.sql
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Turbo
+.turbo/
+
+# Coverage
+coverage/
+*.lcov
+
+# Playwright
+test-results/
+playwright-report/
+
+# Docker volumes
+infra/docker/data/
+
+# SSL certs (nunca comitar!)
+infra/nginx/ssl/
+
+# Next.js — gerado automaticamente
+apps/web/next-env.d.ts
+
+# Prettier
+.prettier-cache
+
+# Vitest
+vitest.config.ts.timestamp*
+
+# Sentry
+.sentryclirc

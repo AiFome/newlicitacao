@@ -1,0 +1,248 @@
+# .github/workflows/ci.yml
+name: CI / CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+# ─────────────────────────────────────────────────────────────
+# JOB 1 — Qualidade (lint + types + format)
+# ─────────────────────────────────────────────────────────────
+jobs:
+  quality:
+    name: Lint, tipos e formatação
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npm run db:generate
+
+      - name: Verificar formatação (Prettier)
+        run: npm run format:check
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript — API
+        run: npx tsc --noEmit -p apps/api/tsconfig.json
+
+      - name: TypeScript — Scraper
+        run: npx tsc --noEmit -p apps/scraper/tsconfig.json
+
+# ─────────────────────────────────────────────────────────────
+# JOB 2 — Testes
+# ─────────────────────────────────────────────────────────────
+  test:
+    name: Testes unitários
+    runs-on: ubuntu-latest
+    needs: quality
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: licitabr
+          POSTGRES_PASSWORD: senha
+          POSTGRES_DB: licitabr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL:      postgresql://licitabr:senha@localhost:5432/licitabr_test
+      REDIS_URL:         redis://localhost:6379
+      JWT_SECRET:        test-secret-ci
+      NODE_ENV:          test
+      ELASTICSEARCH_URL: http://localhost:9200
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npm run db:generate
+
+      - name: Migrations de teste
+        run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+
+      - name: Rodar testes com cobertura
+        run: npm run test:cov
+
+      - name: Upload de cobertura
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: '**/coverage/**'
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────
+# JOB 3 — Build Next.js (verifica se o frontend compila)
+# ─────────────────────────────────────────────────────────────
+  build-web:
+    name: Build Next.js
+    runs-on: ubuntu-latest
+    needs: quality
+
+    env:
+      NEXT_PUBLIC_API_URL:               http://localhost:3001
+      NEXT_PUBLIC_WS_URL:                ws://localhost:3001
+      NEXT_PUBLIC_SITE_URL:              https://licitabr.com.br
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+      NEXT_PUBLIC_STRIPE_PRICE_BASICO:   price_placeholder
+      NEXT_PUBLIC_STRIPE_PRICE_PROFISSIONAL: price_placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npm run db:generate
+
+      - name: Build Next.js
+        run: npm run build --workspace=apps/web
+
+# ─────────────────────────────────────────────────────────────
+# JOB 4 — Build Docker (só em main)
+# ─────────────────────────────────────────────────────────────
+  build-docker:
+    name: Build Docker
+    runs-on: ubuntu-latest
+    needs: [test, build-web]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push API
+        uses: docker/build-push-action@v5
+        with:
+          context:    .
+          file:       apps/api/Dockerfile
+          push:       true
+          tags:       ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-api:${{ github.sha }},${{ secrets.DOCKERHUB_USERNAME }}/licitabr-api:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Build & push Web
+        uses: docker/build-push-action@v5
+        with:
+          context:    .
+          file:       apps/web/Dockerfile
+          push:       true
+          tags:       ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-web:${{ github.sha }},${{ secrets.DOCKERHUB_USERNAME }}/licitabr-web:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+
+      - name: Build & push Scraper
+        uses: docker/build-push-action@v5
+        with:
+          context:    .
+          file:       apps/scraper/Dockerfile
+          push:       true
+          tags:       ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-scraper:${{ github.sha }},${{ secrets.DOCKERHUB_USERNAME }}/licitabr-scraper:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+# ─────────────────────────────────────────────────────────────
+# JOB 5 — Deploy produção
+# ─────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy produção
+    runs-on: ubuntu-latest
+    needs: build-docker
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/licitabr
+
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-api:${{ github.sha }}
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-web:${{ github.sha }}
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-scraper:${{ github.sha }}
+
+            # Migrations antes de reiniciar (zero-downtime)
+            docker run --rm \
+              --env-file /opt/licitabr/.env \
+              ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-api:${{ github.sha }} \
+              node -e "require('./dist/db-migrate.js')" || \
+            docker run --rm \
+              --env-file /opt/licitabr/.env \
+              ${{ secrets.DOCKERHUB_USERNAME }}/licitabr-api:${{ github.sha }} \
+              sh -c "npx prisma migrate deploy"
+
+            export API_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/licitabr-api:${{ github.sha }}
+            export WEB_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/licitabr-web:${{ github.sha }}
+            export SCRAPER_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/licitabr-scraper:${{ github.sha }}
+
+            docker compose -f infra/docker/docker-compose.yml \
+              --profile production \
+              up -d --no-deps api web scraper
+
+            docker image prune -f
+            echo "Deploy concluído: ${{ github.sha }}"

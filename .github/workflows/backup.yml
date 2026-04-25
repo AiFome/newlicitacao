@@ -1,0 +1,78 @@
+# .github/workflows/backup.yml
+name: Backup do banco de dados
+
+on:
+  schedule:
+    # Todo dia às 02:00 UTC (23:00 BRT)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # permite rodar manualmente
+
+jobs:
+  backup:
+    name: pg_dump → S3
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Instalar PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Fazer dump do banco
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          FILENAME="licitabr-$(date +%Y%m%d-%H%M%S).dump"
+          pg_dump \
+            -h ${{ secrets.DB_HOST }} \
+            -U ${{ secrets.DB_USER }} \
+            -d ${{ secrets.DB_NAME }} \
+            -Fc \
+            -f "/tmp/${FILENAME}"
+          echo "FILENAME=${FILENAME}" >> $GITHUB_ENV
+
+      - name: Configurar AWS CLI
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          aws-region:            us-east-1
+
+      - name: Upload para S3
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET:   ${{ secrets.S3_BUCKET }}
+        run: |
+          aws s3 cp \
+            "/tmp/${FILENAME}" \
+            "s3://${S3_BUCKET}/backups/${FILENAME}" \
+            --endpoint-url "${S3_ENDPOINT}"
+          echo "✅ Backup salvo: ${FILENAME}"
+
+      - name: Remover backups com mais de 30 dias
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET:   ${{ secrets.S3_BUCKET }}
+        run: |
+          CUTOFF=$(date -d '30 days ago' +%Y-%m-%dT%H:%M:%S)
+          aws s3api list-objects-v2 \
+            --bucket "${S3_BUCKET}" \
+            --prefix "backups/" \
+            --endpoint-url "${S3_ENDPOINT}" \
+            --query "Contents[?LastModified<='${CUTOFF}'].Key" \
+            --output text | \
+            tr '\t' '\n' | \
+            xargs -I{} aws s3 rm "s3://${S3_BUCKET}/{}" \
+              --endpoint-url "${S3_ENDPOINT}" || true
+
+      - name: Notificar falha
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Falha no backup do banco',
+              body: `Backup falhou em ${new Date().toISOString()}.\n\nVerifique: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['bug', 'infra'],
+            })

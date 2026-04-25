@@ -1,0 +1,41 @@
+{
+  "name": "licitabr",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "db:generate": "cd packages/database && npx prisma generate",
+    "db:migrate": "turbo run db:migrate",
+    "db:seed": "turbo run db:seed",
+    "db:studio": "cd packages/database && npx prisma studio",
+    "telegram:setup": "node scripts/setup-telegram-webhook.js",
+    "telegram:remove": "node scripts/setup-telegram-webhook.js --remove",
+    "telegram:info": "node scripts/setup-telegram-webhook.js --info"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "prettier": "^3.2.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.3",
+    "vitest": "^1.5.0",
+    "@vitest/coverage-v8": "^1.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

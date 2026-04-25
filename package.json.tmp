@@ -1,0 +1,3 @@
+  "telegram:setup":   "node scripts/setup-telegram-webhook.js",
+  "telegram:remove":  "node scripts/setup-telegram-webhook.js --remove",
+  "telegram:info":    "node scripts/setup-telegram-webhook.js --info",

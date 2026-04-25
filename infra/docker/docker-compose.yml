@@ -1,0 +1,176 @@
+# infra/docker/docker-compose.yml
+# Uso em desenvolvimento: docker compose up -d
+# Uso em produção: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.9'
+
+services:
+
+  # ── Banco de dados principal ───────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: licitabr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: licitabr
+      POSTGRES_PASSWORD: senha
+      POSTGRES_DB: licitabr
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U licitabr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis — cache e filas BullMQ ───────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: licitabr-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── ElasticSearch — busca full-text ───────────────────────────────────
+  elasticsearch:
+    image: elasticsearch:8.13.0
+    container_name: licitabr-elastic
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - ELASTIC_PASSWORD=
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+
+  # ── Kibana (desenvolvimento) ───────────────────────────────────────────
+  kibana:
+    image: kibana:8.13.0
+    container_name: licitabr-kibana
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    profiles: ["monitoring"]  # só sobe com: docker compose --profile monitoring up
+
+  # ── Bull Board — dashboard das filas ──────────────────────────────────
+  bull-board:
+    image: deadly0/bull-board:latest
+    container_name: licitabr-bullboard
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_PREFIX: "bull"
+    ports:
+      - "3010:3000"
+    depends_on:
+      - redis
+    profiles: ["monitoring"]
+
+  # ── API Backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../../
+      dockerfile: apps/api/Dockerfile
+    container_name: licitabr-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    env_file:
+      - ../../.env
+    ports:
+      - "3001:3001"
+    volumes:
+      - ../../.env:/app/.env:ro
+
+  # ── Scraper / Workers ──────────────────────────────────────────────────
+  scraper:
+    build:
+      context: ../../
+      dockerfile: apps/scraper/Dockerfile
+    container_name: licitabr-scraper
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started   # aguarda API iniciar antes de disparar alertas
+    env_file:
+      - ../../.env
+    environment:
+      # URL interna da API dentro da rede Docker (sem passar pelo Nginx)
+      INTERNAL_API_URL: http://api:3001
+      # Deve ser igual ao INTERNAL_API_KEY definido no .env
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    # Chromium para Playwright
+    shm_size: '2gb'
+
+  # ── Frontend Next.js ───────────────────────────────────────────────────
+  web:
+    build:
+      context: ../../
+      dockerfile: apps/web/Dockerfile
+    container_name: licitabr-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    env_file:
+      - ../../.env
+    ports:
+      - "3000:3000"
+
+  # ── Nginx reverse proxy ────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: licitabr-nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/ssl:/etc/nginx/ssl:ro
+    profiles: ["production"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  elastic_data:
+
+networks:
+  default:
+    name: licitabr-network

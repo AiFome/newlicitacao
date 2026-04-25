@@ -1,0 +1,48 @@
+# .github/workflows/pr-check.yml
+name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check:
+    name: Verificação rápida de PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (verifica erros de compilação)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL:              http://localhost:3001
+          NEXT_PUBLIC_WS_URL:               ws://localhost:3001
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+
+      - name: Comentar resultado no PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '❌'
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `${status} **Build verificado** — commit \`${{ github.sha }}\``
+            })

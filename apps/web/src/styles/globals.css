@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --font-syne: 'Syne', system-ui, sans-serif;
+  --font-geist-sans: 'DM Sans', system-ui, sans-serif;
+  --font-geist-mono: 'DM Mono', monospace;
+
+  --brand: #1a4731;
+  --brand-light: #edf7f1;
+  --brand-mid: #2d9e65;
+
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --border: #e3e1d8;
+  --muted: #6b6960;
+  --text: #1a1a18;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans);
+}
+
+/* Scrollbar sutil */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #c5c3ba; }
+
+/* Seleção com cor da marca */
+::selection { background: #c8e9d5; color: var(--brand); }
+
+/* Focus ring acessível */
+:focus-visible {
+  outline: 2px solid var(--brand-mid);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /* Botões */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 cursor-pointer select-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-500 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn border border-surface-border bg-transparent text-text hover:bg-surface-muted active:scale-[0.98];
+  }
+  .btn-danger {
+    @apply btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:scale-[0.98];
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white border border-surface-border rounded-xl shadow-card;
+  }
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-hover hover:border-brand-200 cursor-pointer;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full rounded-lg border border-surface-border bg-surface-muted px-3 py-2 text-sm text-text placeholder:text-gray-400
+           focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-all duration-150;
+  }
+
+  /* Badge situação */
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .badge-aberta      { @apply badge bg-emerald-50 text-emerald-700; }
+  .badge-suspensa    { @apply badge bg-amber-50 text-amber-700; }
+  .badge-encerrada   { @apply badge bg-gray-100 text-gray-600; }
+  .badge-homologada  { @apply badge bg-blue-50 text-blue-700; }
+  .badge-novo        { @apply badge bg-brand-100 text-brand-700; }
+
+  /* Tag */
+  .tag { @apply inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-surface-muted text-muted border border-surface-border; }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted
+           hover:bg-surface-muted hover:text-text transition-all duration-150 cursor-pointer;
+  }
+  .nav-item-active {
+    @apply nav-item bg-brand-50 text-brand-700 hover:bg-brand-100 hover:text-brand-700;
+  }
+}

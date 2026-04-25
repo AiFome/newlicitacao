@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false
+  },
+  "include": [],
+  "references": [
+    { "path": "./apps/api" },
+    { "path": "./apps/web" },
+    { "path": "./apps/scraper" },
+    { "path": "./packages/database" },
+    { "path": "./packages/shared" }
+  ]
+}
