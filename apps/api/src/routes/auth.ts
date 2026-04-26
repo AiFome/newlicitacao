@@ -169,7 +169,6 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.send({ ok: true })
   })
-}
 
   // POST /v1/auth/reenviar-verificacao-publico — reenvio sem autenticação (via e-mail)
   app.post('/reenviar-verificacao-publico', async (req, reply) => {
@@ -199,3 +198,4 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.send(RESPOSTA)
   })
+}

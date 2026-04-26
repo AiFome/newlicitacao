@@ -18,7 +18,7 @@ async function dispararAlertas(licitacaoId: string) {
   }
 }
 
-const BASE_URL = process.env.PNCP_API_BASE_URL ?? 'https://pncp.gov.br/api/pncp/v1'
+const BASE_URL = process.env.PNCP_API_BASE_URL ?? 'https://pncp.gov.br/api/consulta/v1'
 
 // Mapeamento da API PNCP para nossos enums
 const MODALIDADE_MAP: Record<number, Modalidade> = {
@@ -165,6 +165,7 @@ export async function coletarPNCP(options: {
       dataFinal: options.dataFim,
       pagina: String(pagina),
       tamanhoPagina: '50',
+      codigoModalidadeContratacao: '8',
     })
 
     totalPaginas = resp.totalPaginas

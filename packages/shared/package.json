@@ -2,11 +2,15 @@
   "name": "@licitabr/shared",
   "version": "1.0.0",
   "private": true,
-  "main": "./src/index.ts",
+  "type": "module",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
-  "devDependencies": {
-    "typescript": "^5.4.0"
+  "scripts": {
+    "build": "tsc --outDir dist"
   }
 }

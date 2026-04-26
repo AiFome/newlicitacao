@@ -5,33 +5,35 @@ import '../styles/globals.css'
 
 export const metadata: Metadata = {
   title: { template: '%s — LicitaBR', default: 'LicitaBR — Monitoramento de Licitações Públicas' },
-  description: 'Monitore editais de licitação de todos os portais públicos em um só lugar. Alertas em tempo real, filtros avançados e dashboard completo.',
-  keywords: ['licitação', 'edital', 'pregão', 'PNCP', 'comprasnet', 'licitações públicas'],
-  openGraph: {
-    title: 'LicitaBR — Monitoramento de Licitações',
-    description: 'Todos os editais públicos do Brasil em um só lugar.',
-    locale: 'pt_BR',
-    type: 'website',
-  },
+  description: 'Monitore licitações públicas do PNCP, Comprasnet, BLL, BNC e mais 10 portais. Alertas em tempo real.',
+  metadataBase: new URL('https://newlicitacao.com'),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body>
-        {children}
         <Toaster
           position="top-right"
           toastOptions={{
             style: {
-              fontFamily: 'var(--font-geist-sans)',
-              fontSize: '14px',
-              borderRadius: '10px',
-              border: '1px solid #e3e1d8',
+              borderRadius: '12px',
+              background: '#fff',
+              color: '#18180f',
+              border: '1px solid #e8e5dd',
+              fontSize: '13px',
+              fontFamily: 'var(--font-sans)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             },
-            success: { iconTheme: { primary: '#1a4731', secondary: '#fff' } },
+            success: { iconTheme: { primary: '#166b45', secondary: '#fff' } },
+            error:   { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
           }}
         />
+        {children}
       </body>
     </html>
   )

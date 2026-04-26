@@ -42,7 +42,6 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
-  output: 'standalone',
   transpilePackages: ['@licitabr/shared'],
   images: {
     remotePatterns: [
