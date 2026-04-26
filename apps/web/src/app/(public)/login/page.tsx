@@ -18,6 +18,7 @@ function LoginContent() {
   const [showPass, setShowPass] = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [erro,     setErro]     = useState('')
+  const [manterConectado, setManterConectado] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -25,7 +26,7 @@ function LoginContent() {
     setLoading(true)
     try {
       const { usuario, token } = await usuarioApi.login(email, senha)
-      setAuth(usuario, token)
+      setAuth(usuario, token, manterConectado)
       const redirect = params.get('redirect') ?? '/dashboard'
       router.push(redirect)
     } catch (err: any) {
@@ -155,6 +156,21 @@ function LoginContent() {
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+            </div>
+
+
+            {/* Manter conectado */}
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="manter"
+                checked={manterConectado}
+                onChange={(e) => setManterConectado(e.target.checked)}
+                className="h-4 w-4 rounded border-surface-border accent-brand-600 cursor-pointer"
+              />
+              <label htmlFor="manter" className="text-sm cursor-pointer select-none" style={{ color: 'var(--muted)' }}>
+                Manter conectado por 7 dias
+              </label>
             </div>
 
             <button type="submit" disabled={loading}

@@ -6,7 +6,7 @@ import { useAuthStore } from '@/lib/auth-store'
 import {
   LayoutDashboard, Search, Heart, Bell,
   Settings, LogOut, FileText, Shield, ChevronRight,
-  Zap,
+  Zap, Tag, User,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -15,6 +15,8 @@ const NAV = [
   { href: '/busca',      label: 'Buscar Editais',    icon: Search },
   { href: '/favoritos',  label: 'Meus Favoritos',    icon: Heart },
   { href: '/alertas',    label: 'Alertas',           icon: Bell },
+  { href: '/monitorar',  label: 'Monitorar',         icon: Tag },
+  { href: '/perfil',     label: 'Meu Perfil',        icon: User as any },
 ]
 
 const NAV_BOTTOM = [

@@ -48,7 +48,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     emailService.enviarVerificacaoEmail(usuario.email, usuario.nome, verifyToken)
       .catch((e) => app.log.error('[Auth] verify email error:', e))
 
-    const token = app.jwt.sign({ sub: usuario.id, email: usuario.email, plano: usuario.plano, role: usuario.role ?? 'USER' })
+    const token = app.jwt.sign({ sub: usuario.id, email: usuario.email, plano: usuario.plano, role: usuario.role ?? 'USER' }, { expiresIn: '2h' })
     return reply.status(201).send({ usuario, token })
   })
 
@@ -65,7 +65,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const ok = await bcrypt.compare(body.senha, usuario.senhaHash)
     if (!ok) return reply.status(401).send({ error: 'Credenciais inválidas.' })
 
-    const token = app.jwt.sign({ sub: usuario.id, email: usuario.email, plano: usuario.plano, role: usuario.role ?? 'USER' })
+    const token = app.jwt.sign({ sub: usuario.id, email: usuario.email, plano: usuario.plano, role: usuario.role ?? 'USER' }, { expiresIn: '2h' })
     await prisma.sessao.create({
       data: { usuarioId: usuario.id, token, userAgent: req.headers['user-agent'], ip: req.ip, expiresAt: new Date(Date.now() + 7 * 86_400_000) },
     })
@@ -198,4 +198,17 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.send(RESPOSTA)
   })
+
+  // POST /v1/auth/renovar — renova o token por mais 2h (requer token válido)
+  app.post('/renovar', { preHandler: authenticate }, async (req, reply) => {
+    const payload = (req as any).user as { sub: string }
+    const usuario = await prisma.usuario.findUnique({
+      where:  { id: payload.sub },
+      select: { id: true, email: true, plano: true, role: true, ativo: true },
+    })
+    if (!usuario?.ativo) return reply.status(401).send({ error: 'Conta inativa.' })
+    const token = app.jwt.sign({ sub: usuario.id, email: usuario.email, plano: usuario.plano, role: usuario.role ?? 'USER' }, { expiresIn: '2h' })
+    return reply.send({ token })
+  })
+
 }

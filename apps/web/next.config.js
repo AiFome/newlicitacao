@@ -60,7 +60,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/', destination: '/landing', permanent: false },
+      // Landing agora é a página raiz - sem redirect
     ]
   },
   async rewrites() {

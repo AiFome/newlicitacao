@@ -43,6 +43,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 // ── Auth ────────────────────────────────────────────────
 export const authApi = {
+  renovar: () => request<{ token: string }>('/v1/auth/renovar', { method: 'POST' }),
   login:    (email: string, senha: string) =>
     request<{ token: string; usuario: Usuario }>('/v1/auth/login', {
       method: 'POST', body: JSON.stringify({ email, senha }), auth: false,
