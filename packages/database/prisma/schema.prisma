@@ -232,6 +232,18 @@ model Favorito {
 // ─────────────────────────────────────────────
 // NOTIFICAÇÕES ENVIADAS
 // ─────────────────────────────────────────────
+
+model MonitorarConfig {
+  id           String   @id @default(uuid())
+  usuarioId    String
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  palavras     String[] @default([])
+  nome         String   @default("Minhas palavras-chave")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("monitorar_configs")
+}
 model Notificacao {
   id            String      @id @default(uuid())
   usuarioId     String

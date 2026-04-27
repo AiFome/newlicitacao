@@ -199,3 +199,9 @@ export interface PaginatedResult<T> {
   fonte?: 'elasticsearch' | 'postgres'
 }
 
+
+export const monitorarApi = {
+  buscar:        () => request<{ id: string; palavras: string[] }>('/v1/monitorar'),
+  salvar:        (palavras: string[]) => request<{ id: string; palavras: string[] }>('/v1/monitorar', { method: 'PUT', body: JSON.stringify({ palavras }) }),
+  removerPalavra:(palavra: string) => request<{ ok: boolean; palavras: string[] }>('/v1/monitorar/palavra', { method: 'DELETE', body: JSON.stringify({ palavra }) }),
+}

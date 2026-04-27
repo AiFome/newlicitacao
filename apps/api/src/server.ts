@@ -23,6 +23,7 @@ import { stripeRoutes } from './routes/stripe.js'
 import { webhookRoutes } from './routes/webhooks.js'
 import { wsRoutes } from './routes/websocket.js'
 import { internalRoutes } from './routes/internal.js'
+import { monitorarRoutes } from './routes/monitorar.js'
 import { adminRoutes }    from './routes/admin.js'
 import { elasticPlugin } from './plugins/elasticsearch.js'
 import { redisPlugin } from './plugins/redis.js'
@@ -87,7 +88,8 @@ await app.register(usuarioRoutes,   { prefix: '/v1/usuarios' })
 await app.register(stripeRoutes,    { prefix: '/v1/stripe' })
 await app.register(webhookRoutes,   { prefix: '/v1/webhooks' })
 await app.register(internalRoutes, { prefix: '/internal' })
-await app.register(adminRoutes,    { prefix: '/v1/admin' })
+await app.register(monitorarRoutes, { prefix: '/v1/monitorar' })
+  await app.register(adminRoutes,    { prefix: '/v1/admin' })
 await app.register(wsRoutes)
 
 // ── Health check ───────────────────────────────────────

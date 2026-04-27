@@ -281,3 +281,14 @@ CREATE TRIGGER orgaos_updated_at    BEFORE UPDATE ON "orgaos"    FOR EACH ROW EX
 CREATE TRIGGER licitacoes_updated_at BEFORE UPDATE ON "licitacoes" FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER usuarios_updated_at  BEFORE UPDATE ON "usuarios"  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER alertas_updated_at   BEFORE UPDATE ON "alerta_configs" FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE "monitorar_configs" (
+  "id"        TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  "usuarioId" TEXT NOT NULL,
+  "palavras"  TEXT[] NOT NULL DEFAULT '{}',
+  "nome"      TEXT NOT NULL DEFAULT 'Minhas palavras-chave',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "monitorar_configs_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "monitorar_configs_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "usuarios"("id") ON DELETE CASCADE
+);
